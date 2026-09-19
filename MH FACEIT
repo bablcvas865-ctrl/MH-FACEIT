@@ -2,19 +2,25 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>MH FACEIT — Mini App</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>MH FACEIT</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --bg: #000000;
     --bg-soft: #0d0d0d;
-    --bg-card: #141414;
-    --line: #2a2a2a;
+    --bg-card: #131313;
+    --bg-card-2: #1a1a1a;
+    --line: #262626;
+    --line-soft: #1f1f1f;
     --text: #f5f5f5;
-    --text-dim: #9a9a9a;
+    --text-dim: #8a8a8a;
+    --text-mute: #555;
     --accent: #ffffff;
     --danger: #ff4d4d;
+    --success: #4dff88;
+    --radius: 16px;
   }
 
   * {
@@ -22,12 +28,13 @@
     padding: 0;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
   }
 
   html, body {
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
   }
@@ -35,121 +42,213 @@
   body {
     padding: 16px 14px 100px;
     background:
-      radial-gradient(circle at 20% 0%, #1a1a1a 0%, transparent 55%),
-      radial-gradient(circle at 80% 100%, #161616 0%, transparent 55%),
+      radial-gradient(circle at 15% 0%, #1c1c1c 0%, transparent 50%),
+      radial-gradient(circle at 85% 100%, #181818 0%, transparent 50%),
       var(--bg);
+    background-attachment: fixed;
   }
 
-  /* ---------- АНИМАЦИИ ---------- */
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
+  /* ============ АНИМАЦИИ ============ */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes shine {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
   }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50%      { opacity: 0.4; }
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to   { opacity: 1; transform: translateY(0); }
+  @keyframes pop {
+    0% { transform: scale(0.8); opacity: 0; }
+    60% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
   }
 
-  .screen {
-    display: none;
-    animation: fadeIn 0.35s ease;
-  }
+  .screen { display: none; animation: fadeIn 0.4s ease; }
   .screen.active { display: block; }
+  .card { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
 
-  /* ---------- HEADER ---------- */
-  .header {
-    text-align: center;
-    margin-bottom: 18px;
-  }
+  /* ============ HEADER ============ */
+  .header { text-align: center; margin-bottom: 20px; padding-top: 4px; }
   .header .line {
     color: var(--line);
-    letter-spacing: 1px;
-    font-size: 11px;
+    letter-spacing: 2px;
+    font-size: 10px;
     overflow: hidden;
     white-space: nowrap;
+    opacity: 0.7;
   }
   .header .title {
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: 4px;
-    margin: 8px 0;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 5px;
+    margin: 10px 0;
     text-transform: uppercase;
+    background: linear-gradient(90deg, #666, #fff, #666);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shine 4s linear infinite;
   }
   .header .title .dot {
     display: inline-block;
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: var(--accent);
     vertical-align: middle;
     margin: 0 8px;
     animation: pulse 2s infinite;
-  }
-  .header .subtitle {
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    text-transform: uppercase;
+    -webkit-text-fill-color: initial;
   }
 
-  /* ---------- CARD ---------- */
+  /* ============ CARD ============ */
   .card {
-    background: var(--bg-card);
+    background: linear-gradient(145deg, var(--bg-card), var(--bg-card-2));
     border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 18px;
+    border-radius: var(--radius);
+    padding: 20px;
     margin-bottom: 14px;
-    animation: slideUp 0.4s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
   }
 
   .card-title {
-    font-size: 12px;
+    font-size: 11px;
     letter-spacing: 3px;
     color: var(--text-dim);
     text-transform: uppercase;
     text-align: center;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
+    font-weight: 700;
   }
 
   .divider {
     color: var(--line);
     font-size: 10px;
-    letter-spacing: 1px;
     overflow: hidden;
     white-space: nowrap;
     text-align: center;
-    margin: 12px 0;
+    margin: 14px 0;
+    opacity: 0.5;
   }
 
-  /* ---------- TEXT ---------- */
-  .greeting {
-    font-size: 15px;
-    margin-bottom: 12px;
-  }
+  /* ============ TEXT ============ */
+  .greeting { font-size: 15px; margin-bottom: 12px; }
   .greeting b { color: var(--accent); }
 
   .info-line {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     font-size: 14px;
-    color: var(--text);
-    margin: 6px 0;
+    margin: 8px 0;
     line-height: 1.4;
   }
-  .info-line .bullet {
-    color: var(--text-dim);
-    font-size: 10px;
-  }
+  .info-line .bullet { color: var(--text-mute); font-size: 10px; }
 
-  /* ---------- STATS GRID ---------- */
+  /* ============ INPUTS ============ */
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    font-weight: 700;
+    padding-left: 4px;
+  }
+  .input-wrap { position: relative; }
+  .input-wrap input {
+    width: 100%;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 15px 16px;
+    color: var(--text);
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    transition: 0.25s;
+  }
+  .input-wrap input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.06);
+  }
+  .input-wrap input::placeholder { color: var(--text-mute); }
+  .input-wrap input:disabled { opacity: 0.5; }
+
+  /* ============ BUTTONS ============ */
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 16px;
+    margin-bottom: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: 0.15s;
+    font-family: inherit;
+  }
+  .btn:active { transform: scale(0.97); background: #1e1e1e; }
+  .btn.primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    box-shadow: 0 4px 20px rgba(255,255,255,0.15);
+  }
+  .btn.primary:active { background: #d9d9d9; }
+  .btn.ghost { background: transparent; }
+  .btn.danger { color: var(--danger); border-color: rgba(255,77,77,0.3); }
+  .btn-row { display: flex; gap: 10px; }
+  .btn-row .btn { margin-bottom: 10px; }
+  .btn-mini { padding: 13px; font-size: 11px; letter-spacing: 1px; }
+  .btn:disabled { opacity: 0.5; pointer-events: none; }
+
+  /* ============ SPONSOR ============ */
+  .sponsor-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    transition: 0.15s;
+    cursor: pointer;
+  }
+  .sponsor-item:active { transform: scale(0.98); border-color: #333; }
+  .sponsor-item .icon {
+    font-size: 20px;
+    width: 44px; height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 11px;
+  }
+  .sponsor-item .name { font-weight: 800; font-size: 13px; letter-spacing: 1px; }
+
+  /* ============ STATS GRID ============ */
   .stats-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -160,157 +259,90 @@
     background: var(--bg-soft);
     border: 1px solid var(--line);
     border-radius: 12px;
-    padding: 12px;
+    padding: 14px 10px;
     text-align: center;
     transition: 0.2s;
   }
   .stat-box:active { transform: scale(0.97); }
   .stat-box .label {
-    font-size: 10px;
+    font-size: 9px;
     letter-spacing: 2px;
     color: var(--text-dim);
     text-transform: uppercase;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    font-weight: 700;
   }
-  .stat-box .value {
-    font-size: 18px;
-    font-weight: 800;
-    color: var(--accent);
-  }
+  .stat-box .value { font-size: 18px; font-weight: 900; color: var(--accent); }
 
-  .profile-head {
+  /* ============ PROFILE ============ */
+  .avatar-wrap {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: 20px;
   }
-  .profile-head .nick {
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: 1px;
-  }
-  .profile-head .level {
-    background: var(--accent);
-    color: #000;
-    font-weight: 800;
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 20px;
-  }
-
-  .mono {
-    font-family: "SF Mono", "Roboto Mono", monospace;
+  .avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
     background: var(--bg-soft);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 2px 8px;
-    font-size: 13px;
-  }
-
-  /* ---------- BUTTONS ---------- */
-  .btn {
+    border: 2px solid var(--line);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    width: 100%;
-    padding: 15px;
-    margin-bottom: 10px;
-    background: var(--bg-card);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    text-transform: uppercase;
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--text-dim);
+    overflow: hidden;
     cursor: pointer;
     transition: 0.2s;
-    font-family: inherit;
+    position: relative;
   }
-  .btn:active {
-    transform: scale(0.98);
-    background: #1e1e1e;
-  }
-  .btn.primary {
-    background: var(--accent);
-    color: #000;
-    border-color: var(--accent);
-  }
-  .btn.primary:active { background: #d9d9d9; }
-  .btn-row {
-    display: flex;
-    gap: 10px;
-  }
-  .btn-row .btn { margin-bottom: 10px; }
-
-  .btn-mini {
-    padding: 12px;
-    font-size: 12px;
-    letter-spacing: 1px;
-    margin-bottom: 0;
-  }
-
-  /* ---------- SPONSORS ---------- */
-  .sponsor-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    background: var(--bg-soft);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    margin-bottom: 8px;
-  }
-  .sponsor-item .icon {
-    font-size: 22px;
-    width: 40px;
-    height: 40px;
+  .avatar:active { transform: scale(0.95); }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .avatar .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg-card);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-  }
-  .sponsor-item .name {
-    font-weight: 800;
-    font-size: 14px;
-    letter-spacing: 1px;
-  }
-
-  /* ---------- INPUT ---------- */
-  .input-wrap {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  .input-wrap input {
-    flex: 1;
-    background: var(--bg-soft);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 14px;
-    color: var(--text);
-    font-size: 16px;
-    font-family: inherit;
-    outline: none;
+    font-size: 24px;
+    opacity: 0;
     transition: 0.2s;
   }
-  .input-wrap input:focus {
-    border-color: var(--accent);
+  .avatar:active .overlay { opacity: 1; }
+  .avatar-hint {
+    font-size: 10px;
+    color: var(--text-mute);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 8px;
   }
-  .input-wrap input::placeholder { color: #555; }
 
-  /* ---------- LOADER ---------- */
+  .nick-display {
+    font-size: 20px;
+    font-weight: 900;
+    text-align: center;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+  }
+  .email-display {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  /* ============ LOADER ============ */
   .loader {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border: 3px solid var(--line);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
-    margin: 20px auto;
+    margin: 24px auto;
   }
   .loading-text {
     text-align: center;
@@ -319,50 +351,129 @@
     letter-spacing: 1px;
   }
 
-  /* ---------- ERROR ---------- */
-  .error-box {
-    border-color: var(--danger);
-  }
+  /* ============ ERROR ============ */
+  .error-box { border-color: rgba(255,77,77,0.4); }
   .error-box .card-title { color: var(--danger); }
 
-  /* ---------- FOOTER ---------- */
+  .banner {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+    display: none;
+    animation: pop 0.3s ease;
+  }
+  .banner.show { display: block; }
+  .banner.error { background: rgba(255,77,77,0.1); color: #ff7b7b; border: 1px solid rgba(255,77,77,0.25); }
+  .banner.success { background: rgba(77,255,136,0.1); color: #7dffa8; border: 1px solid rgba(77,255,136,0.25); }
+
+  /* ============ HEADER USER ============ */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .top-bar .user-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 30px;
+    padding: 6px 14px 6px 6px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .top-bar .user-chip:active { transform: scale(0.97); }
+  .top-bar .user-chip .mini-avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 900;
+    overflow: hidden;
+  }
+  .top-bar .user-chip .mini-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .top-bar .user-chip .name {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ============ FOOTER ============ */
   .footer {
     text-align: center;
-    font-size: 10px;
-    color: #444;
-    letter-spacing: 2px;
-    margin-top: 20px;
+    font-size: 9px;
+    color: #333;
+    letter-spacing: 3px;
+    margin-top: 24px;
     text-transform: uppercase;
   }
 
-  /* ---------- TOAST ---------- */
+  /* ============ TOAST ============ */
   .toast {
     position: fixed;
-    bottom: 24px;
+    bottom: 30px;
     left: 50%;
-    transform: translateX(-50%) translateY(80px);
+    transform: translateX(-50%) translateY(100px);
     background: var(--accent);
     color: #000;
-    padding: 12px 22px;
+    padding: 13px 24px;
     border-radius: 30px;
-    font-size: 13px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 800;
     letter-spacing: 1px;
     opacity: 0;
-    transition: 0.3s;
-    z-index: 999;
+    transition: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 9999;
     pointer-events: none;
+    box-shadow: 0 8px 30px rgba(255,255,255,0.15);
   }
-  .toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--danger); color: #fff; box-shadow: 0 8px 30px rgba(255,77,77,0.3); }
+
+  /* ============ AUTH TABS ============ */
+  .tabs {
+    display: flex;
+    background: var(--bg-soft);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 20px;
+  }
+  .tabs .tab {
+    flex: 1;
+    text-align: center;
+    padding: 11px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 800;
+    color: var(--text-dim);
+    border-radius: 9px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .tabs .tab.active {
+    background: var(--accent);
+    color: #000;
   }
 </style>
 </head>
 <body>
 
-<!-- ================= ГЛАВНОЕ МЕНЮ ================= -->
-<div class="screen active" id="screen-menu">
+<!-- ================= AUTH SCREEN ================= -->
+<div class="screen active" id="screen-auth">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
     <div class="title"><span class="dot"></span>MH FACEIT<span class="dot"></span></div>
@@ -370,133 +481,217 @@
   </div>
 
   <div class="card">
-    <div class="greeting">▫️ Привет, <b id="userName">гость</b>.</div>
-    <div class="info-line"><span class="bullet">▪️</span> Бот для <b>статистики Standoff 2</b></div>
-    <div class="info-line"><span class="bullet">▪️</span> Стиль: <b>чёрно-белый</b></div>
+    <div class="tabs">
+      <div class="tab active" id="tabLogin" onclick="switchAuthTab('login')">ВОЙТИ</div>
+      <div class="tab" id="tabRegister" onclick="switchAuthTab('register')">РЕГИСТРАЦИЯ</div>
+    </div>
+
+    <div id="authBanner" class="banner"></div>
+
+    <!-- LOGIN -->
+    <div id="loginForm">
+      <div class="field">
+        <label>Email</label>
+        <div class="input-wrap"><input type="email" id="loginEmail" placeholder="you@mail.com" autocomplete="email"></div>
+      </div>
+      <div class="field">
+        <label>Пароль</label>
+        <div class="input-wrap"><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+      </div>
+      <button class="btn primary" id="btnLogin" onclick="handleLogin()">⚫ ВОЙТИ</button>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="registerForm" style="display:none;">
+      <div class="field">
+        <label>Nickname</label>
+        <div class="input-wrap"><input type="text" id="regNickname" placeholder="Твой ник" maxlength="20"></div>
+      </div>
+      <div class="field">
+        <label>Standoff 2 ID</label>
+        <div class="input-wrap"><input type="tel" id="regStandoffId" placeholder="12345678" inputmode="numeric" pattern="[0-9]*"></div>
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <div class="input-wrap"><input type="email" id="regEmail" placeholder="you@mail.com" autocomplete="email"></div>
+      </div>
+      <div class="field">
+        <label>Пароль (мин. 6)</label>
+        <div class="input-wrap"><input type="password" id="regPassword" placeholder="••••••••" autocomplete="new-password"></div>
+      </div>
+      <button class="btn primary" id="btnRegister" onclick="handleRegister()">⚪ СОЗДАТЬ АККАУНТ</button>
+    </div>
+  </div>
+
+  <div class="footer">▬▬ MH FACEIT • v2.0 ▬▬</div>
+</div>
+
+<!-- ================= MAIN MENU ================= -->
+<div class="screen" id="screen-menu">
+  <div class="top-bar">
+    <div class="user-chip" onclick="showScreen('profile')">
+      <div class="mini-avatar" id="menuAvatar">?</div>
+      <div class="name" id="menuNick">Player</div>
+    </div>
+    <div class="sponsor-item" style="padding:8px; margin:0; border-radius:30px; cursor:default;">
+      <div class="icon" style="width:auto; height:auto; padding:4px 10px; font-size:11px; font-weight:800; letter-spacing:1px; border:none; background:transparent;">FACEIT</div>
+    </div>
+  </div>
+
+  <div class="header">
+    <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
+    <div class="title"><span class="dot"></span>MH FACEIT<span class="dot"></span></div>
+    <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
+  </div>
+
+  <div class="card">
+    <div class="greeting">▫️ Привет, <b id="userName">игрок</b>.</div>
+    <div class="info-line"><span class="bullet">▪️</span> Просмотр <b>статистики Standoff 2</b></div>
     <div class="info-line"><span class="bullet">▪️</span> Режим: <b>FACEIT</b></div>
     <div class="divider">━━━━━━━━━━━━━━━</div>
     <div id="sponsorsBlockMenu"></div>
   </div>
 
-  <button class="btn primary" onclick="showScreen('stats-input')">🔍 СТАТИСТИКА</button>
+  <button class="btn primary" onclick="showScreen('stats-input')">🔍 МОЯ СТАТИСТИКА</button>
   <button class="btn" onclick="showScreen('sponsors')">🏆 СПОНСОРЫ</button>
   <div class="btn-row">
     <button class="btn btn-mini" onclick="showScreen('about')">⚫ О БОТЕ</button>
     <button class="btn btn-mini" onclick="showScreen('help')">⚪ ПОМОЩЬ</button>
   </div>
 
-  <div class="footer">▬▬ MH FACEIT • v1.1.0 ▬▬</div>
+  <div class="footer">▬▬ MH FACEIT • v2.0 ▬▬</div>
 </div>
 
-<!-- ================= СПОНСОРЫ ================= -->
+<!-- ================= PROFILE ================= -->
+<div class="screen" id="screen-profile">
+  <div class="header">
+    <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
+    <div class="title">⚪ ПРОФИЛЬ ⚫</div>
+    <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
+  </div>
+
+  <div class="card">
+    <div class="avatar-wrap">
+      <div class="avatar" onclick="document.getElementById('avatarInput').click()">
+        <div id="avatarContent">?</div>
+        <div class="overlay">📷</div>
+      </div>
+      <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="handleAvatarUpload(event)">
+      <div class="avatar-hint">Нажми, чтобы сменить</div>
+    </div>
+
+    <div class="nick-display" id="profileNick">—</div>
+    <div class="email-display" id="profileEmail">—</div>
+
+    <div class="divider">━━━━━━━━━━━━━━━</div>
+
+    <div class="field">
+      <label>Nickname</label>
+      <div class="input-wrap"><input type="text" id="profileNicknameInput" maxlength="20"></div>
+    </div>
+    <div class="field">
+      <label>Standoff 2 ID</label>
+      <div class="input-wrap"><input type="tel" id="profileStandoffIdInput" inputmode="numeric" pattern="[0-9]*"></div>
+    </div>
+
+    <div id="profileBanner" class="banner"></div>
+
+    <button class="btn primary" id="btnSaveProfile" onclick="saveProfile()">💾 СОХРАНИТЬ</button>
+  </div>
+
+  <button class="btn danger" onclick="handleLogout()">🚪 ВЫЙТИ</button>
+  <button class="btn" onclick="showScreen('menu')">◼️ В МЕНЮ</button>
+</div>
+
+<!-- ================= SPONSORS ================= -->
 <div class="screen" id="screen-sponsors">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
     <div class="title">⚪ СПОНСОРЫ ⚫</div>
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
   </div>
-
   <div class="card">
-    <div class="sponsor-item" onclick="openSponsor('mh')">
+    <div class="sponsor-item" onclick="showScreen('sponsor-mh')">
       <div class="icon">🏆</div>
       <div class="name">MH CHAMPIONSHIP</div>
     </div>
-    <div class="sponsor-item" onclick="openSponsor('moon')">
+    <div class="sponsor-item" onclick="showScreen('sponsor-moon')">
       <div class="icon">🌙</div>
       <div class="name">MOON HOUSE</div>
     </div>
     <div class="divider">━━━━━━━━━━━━━━━</div>
-    <div style="text-align:center; font-size:12px; color:#888; font-style:italic;">
-      Спасибо за поддержку проекта!
-    </div>
+    <div style="text-align:center; font-size:12px; color:#888; font-style:italic;">Спасибо за поддержку проекта!</div>
   </div>
-
   <button class="btn" onclick="showScreen('menu')">◼️ В МЕНЮ</button>
 </div>
 
-<!-- ================= СПОНСОР: MH ================= -->
+<!-- ================= SPONSOR MH ================= -->
 <div class="screen" id="screen-sponsor-mh">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
-    <div class="title">🏆 MH CHAMPIONSHIP 🏆</div>
+    <div class="title">🏆 MH CHAMPIONSHIP</div>
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
   </div>
-
   <div class="card">
     <div class="info-line"><span class="bullet">▪️</span> Официальный спонсор <b>MH FACEIT</b>.</div>
     <div class="info-line"><span class="bullet">▪️</span> Проводит турниры по Standoff 2.</div>
     <div class="info-line"><span class="bullet">▪️</span> Призовой фонд и сетки — в сообществе.</div>
     <div class="divider">━━━━━━━━━━━━━━━</div>
-    <div style="text-align:center; font-size:12px; color:#888; font-style:italic;">
-      Играешь в SO2? Тогда тебе к ним.
-    </div>
+    <div style="text-align:center; font-size:12px; color:#888; font-style:italic;">Играешь в SO2? Тогда тебе к ним.</div>
   </div>
-
   <button class="btn primary" onclick="openLink('https://t.me/')">🏆 ОТКРЫТЬ КАНАЛ</button>
   <button class="btn" onclick="showScreen('sponsors')">◼️ НАЗАД</button>
 </div>
 
-<!-- ================= СПОНСОР: MOON ================= -->
+<!-- ================= SPONSOR MOON ================= -->
 <div class="screen" id="screen-sponsor-moon">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
-    <div class="title">🌙 MOON HOUSE 🌙</div>
+    <div class="title">🌙 MOON HOUSE</div>
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
   </div>
-
   <div class="card">
     <div class="info-line"><span class="bullet">▪️</span> Партнёр и спонсор <b>MH FACEIT</b>.</div>
     <div class="info-line"><span class="bullet">▪️</span> Сообщество игроков Standoff 2.</div>
     <div class="info-line"><span class="bullet">▪️</span> Тренировки, катки, движ.</div>
     <div class="divider">━━━━━━━━━━━━━━━</div>
-    <div style="text-align:center; font-size:12px; color:#888; font-style:italic;">
-      Ночные катки — их стихия.
-    </div>
+    <div style="text-align:center; font-size:12px; color:#888; font-style:italic;">Ночные катки — их стихия.</div>
   </div>
-
   <button class="btn primary" onclick="openLink('https://t.me/')">🌙 ОТКРЫТЬ КАНАЛ</button>
   <button class="btn" onclick="showScreen('sponsors')">◼️ НАЗАД</button>
 </div>
 
-<!-- ================= О БОТЕ ================= -->
+<!-- ================= ABOUT ================= -->
 <div class="screen" id="screen-about">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
     <div class="title">⚪ О БОТЕ ⚫</div>
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
   </div>
-
   <div class="card">
     <div class="info-line"><span class="bullet">▪️</span> <b>Название:</b> MH FACEIT</div>
-    <div class="info-line"><span class="bullet">▪️</span> <b>Версия:</b> 1.1.0</div>
+    <div class="info-line"><span class="bullet">▪️</span> <b>Версия:</b> 2.0.0</div>
     <div class="info-line"><span class="bullet">▪️</span> <b>Стиль:</b> Black &amp; White</div>
     <div class="info-line"><span class="bullet">▪️</span> <b>Игра:</b> Standoff 2</div>
-    <div class="info-line"><span class="bullet">▪️</span> <b>Режим:</b> FACEIT</div>
+    <div class="info-line"><span class="bullet">▪️</span> <b>Backend:</b> Supabase</div>
     <div class="divider">━━━━━━━━━━━━━━━</div>
     <div id="sponsorsBlockAbout"></div>
-    <div class="divider">━━━━━━━━━━━━━━━</div>
-    <div style="text-align:center; font-size:12px; color:#888; font-style:italic;">
-      Монохромный интерфейс вдохновлён терминалом.
-    </div>
   </div>
-
-  <button class="btn" onclick="showScreen('sponsors')">🏆 СПОНСОРЫ</button>
   <button class="btn" onclick="showScreen('menu')">◼️ НАЗАД</button>
 </div>
 
-<!-- ================= ПОМОЩЬ ================= -->
+<!-- ================= HELP ================= -->
 <div class="screen" id="screen-help">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
     <div class="title">⚫ ПОМОЩЬ ⚪</div>
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
   </div>
-
   <div class="card">
     <div class="info-line"><span class="bullet">▪️</span> Отправь <b>ID игрока</b> Standoff 2.</div>
-    <div class="info-line"><span class="bullet">▪️</span> Бот покажет MMR, K/D, винрейт и матчи.</div>
+    <div class="info-line"><span class="bullet">▪️</span> Бот покажет MMR, K/D, винрейт.</div>
     <div class="divider">━━━━━━━━━━━━━━━</div>
-    <div style="font-size:13px; letter-spacing:1px;">
+    <div style="font-size:13px; letter-spacing:1px; line-height:1.8;">
       <b>Команды:</b><br>
       ◼️ /start — запуск<br>
       ◼️ /menu — меню<br>
@@ -505,36 +700,33 @@
     <div class="divider">━━━━━━━━━━━━━━━</div>
     <div id="sponsorsBlockHelp"></div>
   </div>
-
-  <button class="btn" onclick="showScreen('sponsors')">🏆 СПОНСОРЫ</button>
   <button class="btn" onclick="showScreen('menu')">◼️ НАЗАД</button>
 </div>
 
-<!-- ================= ВВОД ID ================= -->
+<!-- ================= STATS INPUT ================= -->
 <div class="screen" id="screen-stats-input">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
     <div class="title">⚪ ПОИСК ИГРОКА ⚫</div>
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
   </div>
-
   <div class="card">
-    <div class="info-line"><span class="bullet">▪️</span> Отправь <b>ID</b> игрока Standoff 2.</div>
+    <div class="info-line"><span class="bullet">▪️</span> ID игрока Standoff 2.</div>
     <div class="info-line"><span class="bullet">▪️</span> Только цифры.</div>
     <div class="divider">━━━━━━━━━━━━━━━</div>
-    <div style="text-align:center; font-size:12px; color:#888; font-style:italic;">
-      Пример: 12345678
+    <div class="field">
+      <label>Standoff 2 ID</label>
+      <div class="input-wrap">
+        <input type="tel" id="playerIdInput" placeholder="12345678" inputmode="numeric" pattern="[0-9]*">
+      </div>
     </div>
-    <div class="input-wrap">
-      <input type="tel" id="playerIdInput" placeholder="Введите ID..." inputmode="numeric" pattern="[0-9]*">
-    </div>
+    <button class="btn ghost btn-mini" onclick="useMyStandoffId()" style="margin-bottom:0;">👤 ИСПОЛЬЗОВАТЬ МОЙ ID</button>
   </div>
-
   <button class="btn primary" onclick="submitPlayerId()">🔍 НАЙТИ</button>
   <button class="btn" onclick="showScreen('menu')">◼️ ОТМЕНА</button>
 </div>
 
-<!-- ================= ЗАГРУЗКА ================= -->
+<!-- ================= LOADING ================= -->
 <div class="screen" id="screen-loading">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
@@ -547,20 +739,19 @@
   </div>
 </div>
 
-<!-- ================= РЕЗУЛЬТАТ ================= -->
+<!-- ================= RESULT ================= -->
 <div class="screen" id="screen-result">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
     <div class="title">⚫ FACEIT PROFILE ⚪</div>
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
   </div>
-
   <div class="card">
-    <div class="profile-head">
-      <div class="nick" id="resNick">PLAYER</div>
-      <div class="level" id="resLevel">LVL 10</div>
+    <div class="profile-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div style="font-size:18px; font-weight:900; letter-spacing:1px;" id="resNick">PLAYER</div>
+      <div style="background:var(--accent); color:#000; font-weight:900; font-size:12px; padding:5px 12px; border-radius:20px;" id="resLevel">LVL 10</div>
     </div>
-    <div class="info-line"><span class="bullet">▪️</span> <b>ID:</b> <span class="mono" id="resId">—</span></div>
+    <div class="info-line"><span class="bullet">▪️</span> <b>ID:</b> <span style="font-family:monospace; background:var(--bg-soft); padding:3px 10px; border-radius:8px; border:1px solid var(--line);" id="resId">—</span></div>
     <div class="divider">━━━━━━━━━━━━━━━</div>
     <div class="stats-grid">
       <div class="stat-box"><div class="label">MMR</div><div class="value" id="resMmr">—</div></div>
@@ -573,13 +764,11 @@
     <div class="divider">━━━━━━━━━━━━━━━</div>
     <div id="sponsorsBlockResult"></div>
   </div>
-
   <button class="btn primary" onclick="showScreen('stats-input')">🔄 ЕЩЁ РАЗ</button>
-  <button class="btn" onclick="showScreen('sponsors')">🏆 СПОНСОРЫ</button>
   <button class="btn" onclick="showScreen('menu')">◼️ В МЕНЮ</button>
 </div>
 
-<!-- ================= ОШИБКА ================= -->
+<!-- ================= ERROR ================= -->
 <div class="screen" id="screen-error">
   <div class="header">
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
@@ -587,102 +776,108 @@
     <div class="line">▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬</div>
   </div>
   <div class="card error-box">
-    <div class="info-line"><span class="bullet">▪️</span> <span id="errorText">ID должен состоять только из цифр.</span></div>
+    <div class="info-line"><span class="bullet">▪️</span> <span id="errorText">Ошибка</span></div>
   </div>
-  <button class="btn primary" onclick="showScreen('stats-input')">◼️ ПОПРОБОВАТЬ СНОВА</button>
-  <button class="btn" onclick="showScreen('menu')">◼️ В МЕНЮ</button>
+  <button class="btn primary" onclick="goBack()">◼️ НАЗАД</button>
 </div>
 
-<!-- TOAST -->
 <div class="toast" id="toast">Готово</div>
 
 <script>
+/* ============================================================
+   ⚙️ КОНФИГ SUPABASE — ЗАМЕНИ НА СВОИ ЗНАЧЕНИЯ
+   ============================================================ */
+const SUPABASE_URL = "https://ajbnlvzgmgbuysylmklt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqYm5sdnpnbWdidXlzeWxta2x0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4MTcxNzQsImV4cCI6MjEwNTM5MzE3NH0.AkDkm07cutxf2qQaAOSYtdHWyZisR1QwXTpIojfJutg";
+
 /* ============================================================
    ДАННЫЕ
    ============================================================ */
 const BOT_NAME = "MH FACEIT";
 const SPONSORS = [
-  { icon: "🏆", name: "MH CHAMPIONSHIP", key: "mh" },
-  { icon: "🌙", name: "MOON HOUSE",      key: "moon" }
+  { icon: "🏆", name: "MH CHAMPIONSHIP" },
+  { icon: "🌙", name: "MOON HOUSE" }
 ];
 
 /* ============================================================
-   TELEGRAM WEB APP
+   INIT SUPABASE + TELEGRAM
    ============================================================ */
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const tg = window.Telegram?.WebApp;
 if (tg) {
   tg.ready();
   tg.expand();
   tg.setHeaderColor("#000000");
   tg.setBackgroundColor("#000000");
-  const u = tg.initDataUnsafe?.user;
-  if (u) {
-    document.getElementById("userName").textContent =
-      [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username || "гость";
-  }
 }
 
 /* ============================================================
-   НАВИГАЦИЯ
+   STATE
    ============================================================ */
-let currentScreen = "menu";
+let currentUser = null;   // { id, email }
+let currentProfile = null; // { nickname, standoff_id, avatar_url }
+let currentScreen = "auth";
 const history = [];
 
-function showScreen(name, skipHistory = false) {
-  if (!skipHistory && currentScreen !== name) {
-    history.push(currentScreen);
-  }
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  const el = document.getElementById("screen-" + name);
-  if (el) el.classList.add("active");
-  currentScreen = name;
-  window.scrollTo({ top: 0, behavior: "smooth" });
-
-  if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
-}
-
-function goBack() {
-  const prev = history.pop() || "menu";
-  showScreen(prev, true);
-}
-
-/* Кнопка "Назад" Telegram */
-if (tg?.BackButton) {
-  tg.BackButton.onClick(() => {
-    if (currentScreen !== "menu") goBack();
-  });
-  // Показываем кнопку назад только вне меню
-  const observer = new MutationObserver(() => {
-    if (currentScreen === "menu") tg.BackButton.hide();
-    else tg.BackButton.show();
-  });
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-}
-
 /* ============================================================
-   СПОНСОРСКИЙ БЛОК (аналог Python sponsors_block)
+   SPONSORS BLOCK
    ============================================================ */
 function sponsorsBlockHTML() {
-  let html = '<div style="text-align:center;color:#9a9a9a;font-size:11px;letter-spacing:2px;margin-bottom:10px;">⚫ СПОНСОРЫ ⚪</div>';
+  let html = '<div style="text-align:center;color:#9a9a9a;font-size:10px;letter-spacing:3px;margin-bottom:10px;">⚫ СПОНСОРЫ ⚪</div>';
   SPONSORS.forEach(s => {
     html += `<div class="info-line"><span class="bullet">${s.icon}</span> <b>${s.name}</b></div>`;
   });
   return html;
 }
-
-/* Заполняем все блоки спонсоров */
 ["sponsorsBlockMenu", "sponsorsBlockAbout", "sponsorsBlockHelp", "sponsorsBlockResult"]
-  .forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = sponsorsBlockHTML();
-  });
+  .forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = sponsorsBlockHTML(); });
 
 /* ============================================================
-   СПОНСОРЫ
+   NAV
    ============================================================ */
-function openSponsor(key) {
-  showScreen("sponsor-" + key);
-  if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+function showScreen(name, skipHistory = false) {
+  if (!skipHistory && currentScreen !== name) history.push(currentScreen);
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  const el = document.getElementById("screen-" + name);
+  if (el) el.classList.add("active");
+  currentScreen = name;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+
+  if (tg?.BackButton) {
+    if (name === "auth" || name === "menu") tg.BackButton.hide();
+    else tg.BackButton.show();
+  }
+}
+
+function goBack() {
+  const prev = history.pop() || (currentUser ? "menu" : "auth");
+  showScreen(prev, true);
+}
+
+if (tg?.BackButton) {
+  tg.BackButton.onClick(() => goBack());
+}
+
+/* ============================================================
+   TOAST / BANNER
+   ============================================================ */
+let toastTimer;
+function showToast(msg, isError = false) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.toggle("error", isError);
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+function showBanner(elId, msg, type = "error") {
+  const el = document.getElementById(elId);
+  el.className = "banner show " + type;
+  el.textContent = msg;
+  setTimeout(() => el.classList.remove("show"), 5000);
 }
 
 function openLink(url) {
@@ -691,31 +886,264 @@ function openLink(url) {
 }
 
 /* ============================================================
-   СТАТИСТИКА — ЗАГЛУШКА (аналог get_standoff_stats)
+   AUTH TABS
    ============================================================ */
-async function getStandoffStats(playerId) {
-  // Имитация задержки сети
-  await new Promise(r => setTimeout(r, 900));
-  return {
-    nickname: `PLAYER_${playerId}`,
-    mmr: "4500",
-    hours: "120",
-    level: "10",
-    kd: "1.42",
-    winrate: "58%",
-    matches: "342",
-    status: "DEMO"
-  };
+function switchAuthTab(tab) {
+  const loginTab = document.getElementById("tabLogin");
+  const regTab = document.getElementById("tabRegister");
+  const loginForm = document.getElementById("loginForm");
+  const regForm = document.getElementById("registerForm");
+
+  if (tab === "login") {
+    loginTab.classList.add("active");
+    regTab.classList.remove("active");
+    loginForm.style.display = "block";
+    regForm.style.display = "none";
+  } else {
+    regTab.classList.add("active");
+    loginTab.classList.remove("active");
+    regForm.style.display = "block";
+    loginForm.style.display = "none";
+  }
+  if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
 }
 
 /* ============================================================
-   ОТПРАВКА ID
+   AUTH
    ============================================================ */
-async function submitPlayerId() {
-  const input = document.getElementById("playerIdInput");
-  const playerId = input.value.trim();
+async function handleRegister() {
+  const nickname = document.getElementById("regNickname").value.trim();
+  const standoffId = document.getElementById("regStandoffId").value.trim();
+  const email = document.getElementById("regEmail").value.trim();
+  const password = document.getElementById("regPassword").value;
 
-  // Валидация: только цифры
+  if (!nickname || nickname.length < 2) return showBanner("authBanner", "Ник — минимум 2 символа");
+  if (standoffId && !/^\d+$/.test(standoffId)) return showBanner("authBanner", "Standoff ID — только цифры");
+  if (!email || !email.includes("@")) return showBanner("authBanner", "Введи корректный email");
+  if (password.length < 6) return showBanner("authBanner", "Пароль — минимум 6 символов");
+
+  const btn = document.getElementById("btnRegister");
+  btn.disabled = true; btn.textContent = "СОЗДАЮ...";
+
+  const { data, error } = await sb.auth.signUp({
+    email, password,
+    options: {
+      data: { nickname, standoff_id: standoffId }
+    }
+  });
+
+  btn.disabled = false; btn.textContent = "⚪ СОЗДАТЬ АККАУНТ";
+
+  if (error) return showBanner("authBanner", error.message);
+  if (!data.user) return showBanner("authBanner", "Не удалось создать аккаунт");
+
+  // Обновим профиль standoff_id (если указан)
+  if (standoffId && data.session) {
+    await sb.from("profiles").update({ standoff_id: standoffId }).eq("id", data.user.id);
+  }
+
+  showToast("Аккаунт создан!");
+  if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+
+  // Если подтверждение email отключено — сессия сразу есть
+  if (data.session) {
+    currentUser = { id: data.user.id, email: data.user.email };
+    await loadProfile();
+    showScreen("menu");
+  } else {
+    showBanner("authBanner", "Проверь почту для подтверждения", "success");
+  }
+}
+
+async function handleLogin() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+
+  if (!email || !password) return showBanner("authBanner", "Заполни email и пароль");
+
+  const btn = document.getElementById("btnLogin");
+  btn.disabled = true; btn.textContent = "ВХОЖУ...";
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false; btn.textContent = "⚫ ВОЙТИ";
+
+  if (error) return showBanner("authBanner", error.message);
+
+  currentUser = { id: data.user.id, email: data.user.email };
+  await loadProfile();
+  showToast("Добро пожаловать!");
+  if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+  showScreen("menu");
+}
+
+async function handleLogout() {
+  await sb.auth.signOut();
+  currentUser = null;
+  currentProfile = null;
+  document.getElementById("loginEmail").value = "";
+  document.getElementById("loginPassword").value = "";
+  document.getElementById("regNickname").value = "";
+  document.getElementById("regStandoffId").value = "";
+  document.getElementById("regEmail").value = "";
+  document.getElementById("regPassword").value = "";
+  showToast("Вы вышли");
+  showScreen("auth");
+}
+
+/* ============================================================
+   PROFILE LOADING
+   ============================================================ */
+async function loadProfile() {
+  if (!currentUser) return;
+
+  const { data, error } = await sb
+    .from("profiles")
+    .select("nickname, standoff_id, avatar_url")
+    .eq("id", currentUser.id)
+    .single();
+
+  if (error) {
+    console.error("profile load error:", error);
+    // Fallback — попробуем метаданные
+    const meta = (await sb.auth.getUser()).data?.user?.user_metadata || {};
+    currentProfile = {
+      nickname: meta.nickname || "Player",
+      standoff_id: meta.standoff_id || "",
+      avatar_url: null
+    };
+  } else {
+    currentProfile = data;
+  }
+
+  renderProfile();
+}
+
+function renderProfile() {
+  const nick = currentProfile?.nickname || "Player";
+  const initial = nick[0]?.toUpperCase() || "?";
+  const avatarUrl = currentProfile?.avatar_url;
+
+  // Меню
+  document.getElementById("userName").textContent = nick;
+  document.getElementById("menuNick").textContent = nick;
+  const menuAv = document.getElementById("menuAvatar");
+  menuAv.innerHTML = avatarUrl
+    ? `<img src="${avatarUrl}" alt="">`
+    : initial;
+
+  // Профиль
+  document.getElementById("profileNick").textContent = nick;
+  document.getElementById("profileEmail").textContent = currentUser?.email || "";
+  document.getElementById("profileNicknameInput").value = nick;
+  document.getElementById("profileStandoffIdInput").value = currentProfile?.standoff_id || "";
+
+  const av = document.getElementById("avatarContent");
+  av.innerHTML = avatarUrl
+    ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`
+    : initial;
+}
+
+/* ============================================================
+   SAVE PROFILE
+   ============================================================ */
+async function saveProfile() {
+  const nickname = document.getElementById("profileNicknameInput").value.trim();
+  const standoffId = document.getElementById("profileStandoffIdInput").value.trim();
+
+  if (!nickname || nickname.length < 2) return showBanner("profileBanner", "Ник — минимум 2 символа");
+  if (standoffId && !/^\d+$/.test(standoffId)) return showBanner("profileBanner", "ID — только цифры");
+
+  const btn = document.getElementById("btnSaveProfile");
+  btn.disabled = true; btn.textContent = "СОХРАНЯЮ...";
+
+  const { error } = await sb
+    .from("profiles")
+    .update({ nickname, standoff_id: standoffId, updated_at: new Date().toISOString() })
+    .eq("id", currentUser.id);
+
+  btn.disabled = false; btn.textContent = "💾 СОХРАНИТЬ";
+
+  if (error) return showBanner("profileBanner", error.message);
+
+  currentProfile.nickname = nickname;
+  currentProfile.standoff_id = standoffId;
+  renderProfile();
+  showToast("Сохранено!");
+  if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+}
+
+/* ============================================================
+   AVATAR UPLOAD
+   ============================================================ */
+async function handleAvatarUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file || !currentUser) return;
+
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("Максимум 5 MB", true);
+    return;
+  }
+
+  showToast("Загружаю аватар...");
+
+  const ext = file.name.split(".").pop().toLowerCase();
+  const path = `${currentUser.id}/avatar_${Date.now()}.${ext}`;
+
+  const { error: upErr } = await sb.storage
+    .from("avatars")
+    .upload(path, file, { upsert: true, cacheControl: "3600" });
+
+  if (upErr) {
+    console.error(upErr);
+    showToast("Ошибка загрузки", true);
+    return;
+  }
+
+  const { data: pub } = sb.storage.from("avatars").getPublicUrl(path);
+  const avatarUrl = pub.publicUrl;
+
+  const { error: dbErr } = await sb
+    .from("profiles")
+    .update({ avatar_url: avatarUrl })
+    .eq("id", currentUser.id);
+
+  if (dbErr) {
+    showToast("Ошибка сохранения", true);
+    return;
+  }
+
+  currentProfile.avatar_url = avatarUrl;
+  renderProfile();
+  showToast("Аватар обновлён!");
+  if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+}
+
+/* ============================================================
+   STATS (заглушка)
+   ============================================================ */
+async function getStandoffStats(playerId) {
+  await new Promise(r => setTimeout(r, 900));
+  return {
+    nickname: `PLAYER_${playerId}`,
+    mmr: "4500", hours: "120", level: "10",
+    kd: "1.42", winrate: "58%", matches: "342", status: "DEMO"
+  };
+}
+
+function useMyStandoffId() {
+  const myId = currentProfile?.standoff_id;
+  if (!myId) {
+    showToast("Сначала добавь ID в профиль", true);
+    return;
+  }
+  document.getElementById("playerIdInput").value = myId;
+  if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+}
+
+async function submitPlayerId() {
+  const playerId = document.getElementById("playerIdInput").value.trim();
+
   if (!/^\d+$/.test(playerId)) {
     document.getElementById("errorText").textContent = "ID должен состоять только из цифр.";
     showScreen("error");
@@ -723,79 +1151,79 @@ async function submitPlayerId() {
     return;
   }
 
-  // Экран загрузки
   document.getElementById("loadingText").textContent = `Ищу игрока ${playerId}...`;
   showScreen("loading");
-  if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
 
   try {
     const stats = await getStandoffStats(playerId);
-
-    document.getElementById("resNick").textContent   = stats.nickname;
-    document.getElementById("resLevel").textContent  = "LVL " + stats.level;
-    document.getElementById("resId").textContent     = playerId;
-    document.getElementById("resMmr").textContent    = stats.mmr;
-    document.getElementById("resKd").textContent     = stats.kd;
-    document.getElementById("resWr").textContent     = stats.winrate;
-    document.getElementById("resMatches").textContent= stats.matches;
-    document.getElementById("resHours").textContent  = stats.hours;
-    document.getElementById("resStatus").textContent = stats.status;
-
+    document.getElementById("resNick").textContent    = stats.nickname;
+    document.getElementById("resLevel").textContent   = "LVL " + stats.level;
+    document.getElementById("resId").textContent      = playerId;
+    document.getElementById("resMmr").textContent     = stats.mmr;
+    document.getElementById("resKd").textContent      = stats.kd;
+    document.getElementById("resWr").textContent      = stats.winrate;
+    document.getElementById("resMatches").textContent = stats.matches;
+    document.getElementById("resHours").textContent   = stats.hours;
+    document.getElementById("resStatus").textContent  = stats.status;
     showScreen("result");
-    input.value = "";
     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
-
   } catch (e) {
-    console.error("Ошибка получения статы:", e);
-    document.getElementById("errorText").textContent = "Не удалось получить статистику. Попробуй позже.";
+    console.error(e);
+    document.getElementById("errorText").textContent = "Не удалось получить статистику.";
     showScreen("error");
-    if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("error");
   }
 }
 
-/* Enter в поле ввода */
-document.getElementById("playerIdInput").addEventListener("keydown", e => {
+document.getElementById("playerIdInput")?.addEventListener("keydown", e => {
   if (e.key === "Enter") submitPlayerId();
 });
 
 /* ============================================================
-   TOAST
+   BOOT: проверка сессии
    ============================================================ */
-let toastTimer;
-function showToast(msg) {
-  const t = document.getElementById("toast");
-  t.textContent = msg;
-  t.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+async function boot() {
+  const { data } = await sb.auth.getSession();
+  if (data.session?.user) {
+    currentUser = { id: data.session.user.id, email: data.session.user.email };
+    await loadProfile();
+    showScreen("menu");
+  } else {
+    showScreen("auth");
+  }
 }
 
+// Подписка на изменения сессии
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === "SIGNED_OUT") {
+    currentUser = null;
+    currentProfile = null;
+    showScreen("auth");
+  }
+});
+
 /* ============================================================
-   УПРАВЛЕНИЕ ИСТОРИЕЙ (аппаратная кнопка Android)
+   BACK BUTTON / HISTORY
    ============================================================ */
 window.addEventListener("popstate", () => {
-  if (currentScreen !== "menu") {
+  if (currentScreen !== "auth" && currentScreen !== "menu") {
     goBack();
     history.pushState(null, "", location.href);
   }
 });
 history.pushState(null, "", location.href);
 
-/* ============================================================
-   СВАЙП НАЗАД (жест)
-   ============================================================ */
+/* Свайп назад */
 let touchStartX = 0;
-document.addEventListener("touchstart", e => {
-  touchStartX = e.changedTouches[0].screenX;
-}, { passive: true });
-
+document.addEventListener("touchstart", e => { touchStartX = e.changedTouches[0].screenX; }, { passive: true });
 document.addEventListener("touchend", e => {
   const dx = e.changedTouches[0].screenX - touchStartX;
-  if (dx > 80 && currentScreen !== "menu" && touchStartX < 40) {
-    goBack();
-  }
+  if (dx > 80 && touchStartX < 40 && currentScreen !== "auth" && currentScreen !== "menu") goBack();
 }, { passive: true });
-</script>
 
+/* ============================================================
+   START
+   ============================================================ */
+boot();
+</script>
 </body>
 </html>
