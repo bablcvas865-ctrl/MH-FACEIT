@@ -257,10 +257,12 @@ body{background:var(--bg);color:var(--text);min-height:100vh;padding:16px 14px 1
     </div>
 
     <div class="div"></div>
-    <button class="btn tg" id="btnTG" onclick="loginWithTelegram()">
-      <svg viewBox="0 0 24 24"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121L7.32 13.617l-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.94z"/></svg>
-      <span>ВОЙТИ ЧЕРЕЗ TELEGRAM</span>
-    </button>
+<button class="btn tg" id="btnTG" onclick="loginWithTelegram()">
+  <svg viewBox="0 0 240 240" width="22" height="22" fill="#fff">
+    <path d="M120 0C53.7 0 0 53.7 0 120s53.7 120 120 120 120-53.7 120-120S186.3 0 120 0zm55.5 82.3l-18.7 88.1c-1.4 6.3-5.1 7.8-10.3 4.9l-28.5-21-13.8 13.2c-1.5 1.5-2.8 2.8-5.7 2.8l2-28.9 52.7-47.6c2.3-2-.5-3.2-3.5-1.2L75.5 141l-28.1-8.8c-6.1-1.9-6.2-6.1 1.3-9.1l109.8-42.3c5.1-1.9 9.6 1.2 7 8.5z"/>
+  </svg>
+  <span id="btnTGLabel">ВОЙТИ ЧЕРЕЗ TELEGRAM</span>
+</button>
   </div>
   <div class="foot">▬▬ MH FACEIT • v3.0 ▬▬</div>
 </div>
@@ -787,65 +789,121 @@ async function confirmAuthOTP() {
 /* ============================================================
    LOGIN WITH TELEGRAM
    ============================================================ */
+/* ============================================================
+   LOGIN WITH TELEGRAM
+   - Если открыто в Telegram Mini App → авто-вход (создаёт аккаунт если нет)
+   - Если открыто в браузере → редирект в бота
+   ============================================================ */
 async function loginWithTelegram() {
-  if (!tg) {
-    return banner("authBanner", "Открой приложение через Telegram-бота");
+  const isTelegram = !!tg && !!tg.initData;
+
+  // === Случай 1: Открыто НЕ в Telegram → редирект в бота ===
+  if (!isTelegram) {
+    // Замени на username своего бота
+    const BOT_USERNAME = "MH_CHAMPIONSHIP_bot";
+    const botUrl = `https://t.me/${BOT_USERNAME}?startapp=login`;
+
+    // Показываем заглушку на 1.5 секунды и редиректим
+    toast("Открываю Telegram...", "ok");
+    setTimeout(() => {
+      window.location.href = botUrl;
+    }, 600);
+    return;
   }
+
+  // === Случай 2: Открыто в Telegram → автологин ===
   const initData = tg.initData;
   const tgUser = tg.initDataUnsafe?.user;
+
   if (!initData || !tgUser) {
-    return banner("authBanner", "Не удалось получить данные Telegram");
+    return banner("authBanner", "Не удалось получить данные Telegram. Перезапусти приложение.");
   }
 
   const btn = document.getElementById("btnTG");
-  btn.classList.add("loading"); btn.disabled = true;
+  const label = document.getElementById("btnTGLabel");
+  btn.classList.add("loading");
+  btn.disabled = true;
+  if (label) label.textContent = "ПРОВЕРЯЮ...";
 
   try {
-    // Deterministic virtual email/password from Telegram ID
+    // Виртуальный email/пароль на основе Telegram ID (детерминированные)
     const virtualEmail = `tg_${tgUser.id}@mhfaceit.local`;
-    // Password = hash of initData (deterministic but not trivial to guess)
-    const virtualPassword = await sha256Hex("mh_faceit_" + initData);
+    const virtualPassword = await sha256Hex("mh_faceit_v1_" + tgUser.id + "_" + initData.slice(-32));
 
-    // Try sign in
+    // 1. Пробуем войти
     let { data, error } = await sb.auth.signInWithPassword({
-      email: virtualEmail, password: virtualPassword
+      email: virtualEmail,
+      password: virtualPassword
     });
 
+    // 2. Если не получилось — регистрируем нового
     if (error) {
-      // Create new account
+      if (label) label.textContent = "СОЗДАЮ АККАУНТ...";
       const nick = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ")
-        || tgUser.username || `tg_${tgUser.id}`;
+        || tgUser.username
+        || `Player_${tgUser.id}`;
+
       const { data: signUpData, error: signUpErr } = await sb.auth.signUp({
-        email: virtualEmail, password: virtualPassword,
-        options: { data: { nickname: nick, telegram_id: String(tgUser.id), telegram_username: tgUser.username || "" } }
+        email: virtualEmail,
+        password: virtualPassword,
+        options: {
+          data: {
+            nickname: nick,
+            telegram_id: String(tgUser.id),
+            telegram_username: tgUser.username || ""
+          }
+        }
       });
+
       if (signUpErr) throw signUpErr;
-      data = signUpData;
+
+      // Если email-подтверждение включено — Supabase не даст сессию.
+      // В настройках Auth → Email → "Confirm email" = OFF обязательно!
+      if (!signUpData.session) {
+        // Пробуем войти сразу после регистрации
+        const { data: retryData, error: retryErr } = await sb.auth.signInWithPassword({
+          email: virtualEmail,
+          password: virtualPassword
+        });
+        if (retryErr) throw retryErr;
+        data = retryData;
+      } else {
+        data = signUpData;
+      }
     }
 
-    if (!data.user) throw new Error("Не удалось войти");
+    if (!data?.user) throw new Error("Не удалось войти");
 
     user = { id: data.user.id, email: data.user.email };
 
-    // Ensure profile has telegram_id
+    // 3. Гарантируем, что профиль есть и telegram_id записан
+    const nick = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ")
+      || tgUser.username
+      || "Player";
+
     await sb.from("profiles").upsert({
       id: user.id,
       email: user.email,
-      nickname: [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") || tgUser.username || "Player",
+      nickname: nick,
       telegram_id: String(tgUser.id),
       telegram_username: tgUser.username || null
     }, { onConflict: "id" });
 
+    // 4. Загружаем профиль и пускаем внутрь
     await loadProfile();
-    toast("Добро пожаловать!", "ok");
+
+    if (label) label.textContent = "УСПЕХ";
+    toast(`Привет, ${nick}!`, "ok");
     if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
     show("menu", true);
 
   } catch (e) {
-    console.error(e);
+    console.error("TG login error:", e);
     banner("authBanner", e.message || "Ошибка входа через Telegram");
+    if (label) label.textContent = "ВОЙТИ ЧЕРЕЗ TELEGRAM";
   } finally {
-    btn.classList.remove("loading"); btn.disabled = false;
+    btn.classList.remove("loading");
+    btn.disabled = false;
   }
 }
 
@@ -1131,10 +1189,16 @@ async function boot() {
   if (data.session?.user) {
     user = { id: data.session.user.id, email: data.session.user.email };
     await loadProfile();
-    show("menu", true);
-  } else {
-    show("auth", true);
+    return show("menu", true);
   }
+
+  // Автологин через Telegram, если открыто в Mini App
+  const isTelegram = !!tg && !!tg.initData;
+  if (isTelegram) {
+    return loginWithTelegram();
+  }
+
+  show("auth", true);
 }
 
 sb.auth.onAuthStateChange((event, session) => {
